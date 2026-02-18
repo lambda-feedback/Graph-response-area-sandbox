@@ -165,7 +165,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     })
 
     cyRef.current = cy
-    console.log('Cytoscape initialized')
+
 
     return () => {
       cy.destroy()
@@ -173,12 +173,24 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     }
   }, [])
 
+  /* -------------------- Update Node Counter -------------------- */
+  useEffect(() => {
+    // Find the highest node number to avoid duplicate IDs
+    let maxNum = 0
+    graph.nodes.forEach(node => {
+      const match = node.id.match(/^n(\d+)$/)
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10)
+        if (num > maxNum) maxNum = num
+      }
+    })
+    setNodeCounter(maxNum + 1)
+  }, [graph.nodes])
+
   /* -------------------- Update Cytoscape from Graph -------------------- */
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
-
-    console.log('Updating cytoscape from graph', graph)
 
     // Get existing elements
     const existingNodeIds = new Set(cy.nodes().map(n => n.id()))
@@ -304,7 +316,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // Create a new Paper.js project for this instance
     const paperProject = new paper.Project(canvas)
     paperProjectRef.current = paperProject
-    console.log('Paper.js project created')
+
 
     // Setup canvas size
     const updateCanvasSize = () => {
@@ -545,15 +557,12 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         return
       }
       
-      console.log('Node clicked:', node.id())
-      console.log('Setting selectedNodeId to:', node.id())
       setSelectedNodeId(node.id())
       setSelectedEdgeId(null)
     }
 
     const tapEdge = (e: cytoscape.EventObject) => {
       const edge = e.target as EdgeSingular
-      console.log('Edge clicked:', edge.id())
       setSelectedEdgeId(edge.id())
       setSelectedNodeId(null)
     }
@@ -561,7 +570,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     const tapBlank = (e: cytoscape.EventObject) => {
       // Only clear selection if we clicked the background (not a node or edge)
       if (e.target === cy) {
-        console.log('Blank clicked - clearing selection')
         setSelectedNodeId(null)
         setSelectedEdgeId(null)
       }
@@ -582,11 +590,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Get fresh node/edge references from IDs
   const selectedNode = selectedNodeId && cyRef.current ? cyRef.current.$id(selectedNodeId) : null
   const selectedEdge = selectedEdgeId && cyRef.current ? cyRef.current.$id(selectedEdgeId) : null
-  
-  console.log('GraphEditor render - selectedNodeId:', selectedNodeId, 'selectedEdgeId:', selectedEdgeId)
-  console.log('selectedNode:', selectedNode?.id(), 'length:', selectedNode?.length, 'selectedEdge:', selectedEdge?.id(), 'length:', selectedEdge?.length)
-  console.log('Should show node panel:', !!(selectedNode && selectedNode.length > 0))
-  console.log('Should show edge panel:', !!(selectedEdge && selectedEdge.length > 0))
   
   return (
     <div className={classes.container}>
@@ -645,19 +648,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             • Or click nodes to connect them
           </div>
         )}
-
-        {/* Debug info */}
-        <div style={{ 
-          fontSize: '10px', 
-          color: '#999', 
-          padding: '4px',
-          backgroundColor: '#f0f0f0',
-          borderRadius: '2px',
-          marginTop: '8px'
-        }}>
-          Debug: nodeId={selectedNodeId || 'none'}, edgeId={selectedEdgeId || 'none'}<br/>
-          Node exists: {selectedNode ? 'yes' : 'no'}, Length: {selectedNode?.length || 0}
-        </div>
 
         {selectedNode && selectedNode.length > 0 ? (
           <>

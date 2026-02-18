@@ -41,8 +41,16 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
   private previewFeedback: GraphFeedback | null = null
   private phase: CheckPhase = CheckPhase.Idle
 
-  public readonly delegateFeedback = false
+  // Temporarily test with delegateFeedback = true
+  public readonly delegateFeedback = true
   public readonly delegateLivePreview = true
+
+  constructor() {
+    super()
+    console.log('[Graph Constructor] GraphResponseAreaTub instantiated')
+    console.log('[Graph Constructor] customCheck method:', this.customCheck)
+    console.log('[Graph Constructor] typeof customCheck:', typeof this.customCheck)
+  }
 
   initWithDefault = () => {
     this.config = {
@@ -63,6 +71,11 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       name:'',
       metadata: {},
     }
+  }
+
+  initWithConfig = () => {
+    // Called by the parent app when initialising with config only (student view)
+    // config is already extracted via extractConfig — nothing extra needed
   }
 
   // Override extractConfig to handle missing/invalid config gracefully
@@ -99,19 +112,69 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
     this.config = parsedConfig.data
   }
 
-  /* -------------------- Custom Check -------------------- */
-  customCheck(): void {
-    // Block submission if preview validation fails
-    if (this.previewFeedback) {
-      throw new Error('preview failed')
+  // Override extractAnswer to properly store student's answer
+  protected extractAnswer = (provided: any): void => {
+    console.log('[Graph extractAnswer] Called with:', provided)
+    
+    if (!provided || typeof provided !== 'object') {
+      console.log('[Graph extractAnswer] No valid answer provided')
+      return
     }
 
-    // Preview passed — ensure it's cleared
-    this.previewFeedback = null
+    const parsedAnswer = this.answerSchema.safeParse(provided)
+    if (!parsedAnswer.success) {
+      console.log('[Graph extractAnswer] Failed to parse answer:', parsedAnswer.error)
+      return
+    }
+
+    console.log('[Graph extractAnswer] Successfully extracted answer:', parsedAnswer.data)
+    this.answer = parsedAnswer.data
+  }
+
+  /* -------------------- Custom Check -------------------- */
+  customCheck = (): boolean => {
+    console.log('[Graph customCheck] Called')
+    console.log('[Graph customCheck] this.answer:', this.answer)
+    
+    // Validate the student's answer before submission
+    if (!this.answer || this.answer.nodes.length === 0) {
+      console.log('[Graph customCheck] No answer or empty graph - returning false')
+      return false // No answer to submit
+    }
+
+    // Decompress the graph (convert stringified nodes/edges back to objects)
+    const decompressedGraph: Graph = {
+      nodes: this.answer.nodes.map((e) => JSON.parse(e)),
+      edges: this.answer.edges.map((e) => JSON.parse(e)),
+      directed: this.answer.directed,
+      weighted: this.answer.weighted,
+      multigraph: this.answer.multigraph,
+      name: this.answer.name || '',
+      metadata: this.answer.metadata || {},
+    }
+
+    console.log('[Graph customCheck] Decompressed graph:', decompressedGraph)
+
+    // Validate the decompressed graph
+    const feedback = validateGraph(decompressedGraph)
+    
+    console.log('[Graph customCheck] Validation feedback:', feedback)
+    
+    // Check if there are any errors
+    const hasErrors = feedback.errors.filter(e => e.type === 'error').length > 0
+    
+    console.log('[Graph customCheck] Has errors:', hasErrors)
+    console.log('[Graph customCheck] Returning:', !hasErrors)
+    
+    // Return true if valid, false if there are errors
+    return !hasErrors
   }
 
   /* -------------------- Input -------------------- */
   InputComponent = (props: BaseResponseAreaProps) => {
+    console.log('[Graph InputComponent] Rendering with props.answer:', props.answer)
+    console.log('[Graph InputComponent] Current this.answer:', this.answer)
+    
     // In teacher preview mode, edit the initial config
     // In student mode, start with config and save to props.answer
     const isTeacherPreview = props.isTeacherMode && props.hasPreview
@@ -122,12 +185,21 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
         // If props.answer exists, use it (parent component's state)
         const parsed = this.answerSchema.safeParse(props.answer)
         if (parsed.success) {
+          // Update this.answer so customCheck can access it
+          console.log('[Graph InputComponent] Updating this.answer with parsed data:', parsed.data)
+          this.answer = parsed.data
           return parsed.data
+        } else {
+          console.log('[Graph InputComponent] Failed to parse props.answer:', parsed.error)
         }
+      } else {
+        console.log('[Graph InputComponent] No props.answer provided')
       }
       
       // Fallback to config (initial state) or answer (for teacher answer panel)
-      return isTeacherPreview ? this.config : (this.config ?? this.answer)
+      const fallback = isTeacherPreview ? this.config : (this.config ?? this.answer)
+      console.log('[Graph InputComponent] Using fallback:', fallback)
+      return fallback
     })()
 
     /* ---------- Extract submitted feedback ---------- */
@@ -165,6 +237,8 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
         feedback={effectiveFeedback}
         phase={this.phase}
         onChange={(val: Graph) => {
+          console.log('[Graph onChange] Called with graph:', val)
+          
           const compressed: CompressedGraph = {
             nodes: val.nodes.map((n) => JSON.stringify(n)),
             edges: val.edges.map((e) => JSON.stringify(e)),
@@ -175,10 +249,19 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
             metadata: val.metadata,
           }
 
+          console.log('[Graph onChange] Compressed:', compressed)
+
           if (isTeacherPreview) {
             // Teacher is editing the initial config in preview section
+            console.log('[Graph onChange] Updating this.config')
             this.config = compressed
+          } else {
+            // Student is working - save their current answer for validation
+            console.log('[Graph onChange] Updating this.answer')
+            this.answer = compressed
           }
+
+          console.log('[Graph onChange] After update, this.answer:', this.answer)
 
           // Validate the graph
           const preview = validateGraph(val)
@@ -191,7 +274,9 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
             this.phase = CheckPhase.Idle
           }
 
+          console.log('[Graph onChange] Calling props.handleChange with compressed data')
           props.handleChange(compressed)
+          console.log('[Graph onChange] props.handleChange called')
         }}
       />
     )
