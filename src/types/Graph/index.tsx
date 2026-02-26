@@ -5,45 +5,36 @@ import {
 import { ResponseAreaTub } from '../response-area-tub'
 
 import { GraphEditor } from './Graph.component'
-import { Graph, CompressedGraph, CompressedGraphSchema, GraphFeedback, CheckPhase } from './type'
-import { Edge, Node } from './type'
+import { Graph, SimpleGraph, SimpleGraphSchema, GraphFeedback, CheckPhase, toSimpleGraph, fromSimpleGraph } from './type'
 import { validateGraph } from './validateGraph'
 
 export class GraphResponseAreaTub extends ResponseAreaTub {
   public readonly responseType = 'HANDDRAWNGRAPH'
   public readonly displayWideInput = true
 
-  protected answerSchema = CompressedGraphSchema
-  protected configSchema = CompressedGraphSchema
+  protected answerSchema = SimpleGraphSchema
+  protected configSchema = SimpleGraphSchema
 
   // Correct answer for grading (teacher sets in "answer" panel)
-  protected answer: CompressedGraph = {
+  protected answer: SimpleGraph = {
     nodes: [],
     edges: [],
     directed: false,
     weighted: false,
     multigraph: false,
-    name:'',
-    metadata: {},
   }
 
   // Initial state shown to students (teacher sets in "preview" panel)
-  protected config: CompressedGraph = {
+  protected config: SimpleGraph = {
     nodes: [],
     edges: [],
     directed: false,
     weighted: false,
     multigraph: false,
-    name:'',
-    metadata: {},
   }
-
-  private previewFeedback: GraphFeedback | null = null
-  private phase: CheckPhase = CheckPhase.Idle
 
   // Temporarily test with delegateFeedback = true
   public readonly delegateFeedback = true
-  public readonly delegateLivePreview = true
 
   constructor() {
     super()
@@ -59,8 +50,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       directed: false,
       weighted: false,
       multigraph: false,
-      name:'',
-      metadata: {},
     }
     this.answer = {
       nodes: [],
@@ -68,8 +57,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       directed: false,
       weighted: false,
       multigraph: false,
-      name:'',
-      metadata: {},
     }
   }
 
@@ -88,8 +75,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
         directed: false,
         weighted: false,
         multigraph: false,
-        name:'',
-        metadata: {},
       }
       return
     }
@@ -103,8 +88,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
         directed: false,
         weighted: false,
         multigraph: false,
-        name:'',
-        metadata: {},
       }
       return
     }
@@ -142,21 +125,12 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       return false // No answer to submit
     }
 
-    // Decompress the graph (convert stringified nodes/edges back to objects)
-    const decompressedGraph: Graph = {
-      nodes: this.answer.nodes.map((e) => JSON.parse(e)),
-      edges: this.answer.edges.map((e) => JSON.parse(e)),
-      directed: this.answer.directed,
-      weighted: this.answer.weighted,
-      multigraph: this.answer.multigraph,
-      name: this.answer.name || '',
-      metadata: this.answer.metadata || {},
-    }
+    // Convert from SimpleGraph to Graph for validation
+    const graph = fromSimpleGraph(this.answer)
+    console.log('[Graph customCheck] Converted graph:', graph)
 
-    console.log('[Graph customCheck] Decompressed graph:', decompressedGraph)
-
-    // Validate the decompressed graph
-    const feedback = validateGraph(decompressedGraph)
+    // Validate the graph
+    const feedback = validateGraph(graph)
     
     console.log('[Graph customCheck] Validation feedback:', feedback)
     
@@ -180,14 +154,12 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
     const isTeacherPreview = props.isTeacherMode && props.hasPreview
     
     // Determine the source of truth for the graph data
-    const initialGraph: CompressedGraph = (() => {
+    const initialGraph: SimpleGraph = (() => {
       if (props.answer) {
         // If props.answer exists, use it (parent component's state)
         const parsed = this.answerSchema.safeParse(props.answer)
         if (parsed.success) {
-          // Update this.answer so customCheck can access it
-          console.log('[Graph InputComponent] Updating this.answer with parsed data:', parsed.data)
-          this.answer = parsed.data
+          console.log('[Graph InputComponent] Using parsed props.answer:', parsed.data)
           return parsed.data
         } else {
           console.log('[Graph InputComponent] Failed to parse props.answer:', parsed.error)
@@ -208,74 +180,47 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       if (!raw) return null
 
       try {
-        const jsonPart = raw.split('<br>')[1]?.trim()
+        const jsonPart = raw.split('<br />')[1]?.trim()
         if (!jsonPart) return null
         return JSON.parse(jsonPart)
-      } catch {
+      } catch (e) {
+        console.error('Failed to parse feedback JSON:', e)
         return null
       }
     })()
 
     /* ---------- Effective feedback ---------- */
-    const effectiveFeedback = this.previewFeedback ?? submittedFeedback
+    const effectiveFeedback = submittedFeedback
 
-    // Decompress to Graph format for editor
-    const graph: Graph = {
-      nodes: initialGraph.nodes.map((e) => JSON.parse(e)),
-      edges: initialGraph.edges.map((e) => JSON.parse(e)),
-      directed: initialGraph.directed,
-      weighted: initialGraph.weighted,
-      multigraph: initialGraph.multigraph,
-      name: initialGraph.name,
-      metadata: initialGraph.metadata,
-    }
+    // Convert from SimpleGraph to Graph for editor
+    const graph: Graph = fromSimpleGraph(initialGraph)
 
     return (
       <GraphEditor
         key={isTeacherPreview ? "teacher-preview-editor" : "student-input-editor"}
         graph={graph}
         feedback={effectiveFeedback}
-        phase={this.phase}
+        phase={CheckPhase.Idle}
         onChange={(val: Graph) => {
           console.log('[Graph onChange] Called with graph:', val)
-          
-          const compressed: CompressedGraph = {
-            nodes: val.nodes.map((n) => JSON.stringify(n)),
-            edges: val.edges.map((e) => JSON.stringify(e)),
-            directed: val.directed,
-            weighted: val.weighted,
-            multigraph: val.multigraph,
-            name: val.name,
-            metadata: val.metadata,
-          }
 
-          console.log('[Graph onChange] Compressed:', compressed)
+          // Convert to SimpleGraph for backend
+          const simple = toSimpleGraph(val)
 
           if (isTeacherPreview) {
             // Teacher is editing the initial config in preview section
             console.log('[Graph onChange] Updating this.config')
-            this.config = compressed
+            this.config = simple
           } else {
             // Student is working - save their current answer for validation
             console.log('[Graph onChange] Updating this.answer')
-            this.answer = compressed
+            this.answer = simple
           }
 
           console.log('[Graph onChange] After update, this.answer:', this.answer)
 
-          // Validate the graph
-          const preview = validateGraph(val)
-
-          if (preview.errors.filter((e) => e.type === 'error').length > 0) {
-            this.previewFeedback = preview
-            this.phase = CheckPhase.PreviewError
-          } else {
-            this.previewFeedback = null
-            this.phase = CheckPhase.Idle
-          }
-
-          console.log('[Graph onChange] Calling props.handleChange with compressed data')
-          props.handleChange(compressed)
+          console.log('[Graph onChange] Calling props.handleChange with simple graph data')
+          props.handleChange(simple)
           console.log('[Graph onChange] props.handleChange called')
         }}
       />
@@ -286,15 +231,7 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
   WizardComponent = (props: BaseResponseAreaWizardProps) => {
     // Wizard shows correct answer for grading
     // The separate "Response Area Preview" section handles the initial state (config)
-    const answerGraph: Graph = {
-      nodes: this.answer.nodes.map((e) => JSON.parse(e)),
-      edges: this.answer.edges.map((e) => JSON.parse(e)),
-      directed: this.answer.directed,
-      weighted: this.answer.weighted,
-      multigraph: this.answer.multigraph,
-      name: this.answer.name,
-      metadata: this.answer.metadata,
-    }
+    const answerGraph: Graph = fromSimpleGraph(this.answer)
 
     return (
       <GraphEditor
@@ -303,22 +240,13 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
         feedback={null}
         phase={CheckPhase.Evaluated}
         onChange={(val: Graph) => {
-          const compressed: CompressedGraph = {
-            nodes: val.nodes.map((n: Node) => JSON.stringify(n)),
-            edges: val.edges.map((e: Edge) => JSON.stringify(e)),
-            directed: val.directed,
-            weighted: val.weighted,
-            multigraph: val.multigraph,
-            name: val.name,
-            metadata: val.metadata,
-          }
-
-          this.answer = compressed
+          const simple = toSimpleGraph(val)
+          this.answer = simple
 
           props.handleChange({
             responseType: this.responseType,
             config: this.config,
-            answer: compressed,
+            answer: simple,
           })
         }}
       />

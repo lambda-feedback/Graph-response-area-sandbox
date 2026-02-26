@@ -16,3 +16,4 @@ tsconfig.tsbuildinfo
 
 # env files (copy .env.example)
 .env
+FSA

@@ -25,9 +25,7 @@ export function GraphFeedbackPanel({
   if (!feedback || !parsed.success) {
     return (
       <div style={{ opacity: 0.6, fontStyle: 'italic' }}>
-        {phase === CheckPhase.PreviewError
-          ? 'Preview errors found'
-          : 'No feedback yet'}
+        No feedback yet
       </div>
     )
   }
@@ -48,19 +46,13 @@ export function GraphFeedbackPanel({
           fontWeight: 600,
         }}
       >
-        {
-          phase === CheckPhase.PreviewError ? "Errors in Preview" : "Errors in Evaluation"
-        }
+        Validation Results
       </div>
 
       {/* ================= Errors ================= */}
       {errors.length > 0 && (
         <FeedbackSection
-          title={
-            phase === CheckPhase.PreviewError
-              ? 'Preview Errors'
-              : 'Errors'
-          }
+          title="Errors"
           items={errors}
           accent="#d32f2f"
         />

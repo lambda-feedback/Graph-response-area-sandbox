@@ -99,6 +99,6 @@ export function validateGraph(graph: Graph): GraphFeedback {
   return {
     valid: errors.filter((e) => e.type === 'error').length === 0,
     errors,
-    phase: errors.length > 0 ? CheckPhase.PreviewError : CheckPhase.Idle,
+    phase: CheckPhase.Idle,
   }
 }

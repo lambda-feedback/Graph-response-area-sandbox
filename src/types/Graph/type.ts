@@ -42,11 +42,69 @@ export const GraphSchema = z.object({
   directed: z.boolean().default(false),
   weighted: z.boolean().default(false),
   multigraph: z.boolean().default(false),
-  name: z.string().optional(),
   metadata: z.record(z.any()).optional().default({}),
 });
 
 export type Graph = z.infer<typeof GraphSchema>
+
+// -----------------------------
+// Simplified Graph: for backend communication (like FSA)
+// -----------------------------
+export const SimpleGraphSchema = z.object({
+  // Nodes as pipe-delimited strings: "id|label|x|y"
+  nodes: z.array(z.string()),
+  // Edges as pipe-delimited strings: "source|target|weight|label"
+  edges: z.array(z.string()),
+  directed: z.boolean().default(false),
+  weighted: z.boolean().default(false),
+  multigraph: z.boolean().default(false),
+});
+
+export type SimpleGraph = z.infer<typeof SimpleGraphSchema>
+
+// Helper functions to convert between Graph and SimpleGraph
+export function toSimpleGraph(graph: Graph): SimpleGraph {
+  return {
+    nodes: graph.nodes.map(n => 
+      `${n.id}|${n.label || ''}|${n.x || 0}|${n.y || 0}`
+    ),
+    edges: graph.edges.map(e => 
+      `${e.source}|${e.target}|${e.weight || 1}|${e.label || ''}`
+    ),
+    directed: graph.directed,
+    weighted: graph.weighted,
+    multigraph: graph.multigraph,
+  };
+}
+
+export function fromSimpleGraph(simple: SimpleGraph): Graph {
+  return {
+    nodes: simple.nodes.map(str => {
+      const [id = '', label = '', xStr = '0', yStr = '0'] = str.split('|');
+      return {
+        id,
+        label: label || undefined,
+        x: parseFloat(xStr) || 0,
+        y: parseFloat(yStr) || 0,
+        metadata: {},
+      };
+    }),
+    edges: simple.edges.map(str => {
+      const [source = '', target = '', weightStr = '1', label = ''] = str.split('|');
+      return {
+        source,
+        target,
+        weight: parseFloat(weightStr) || 1,
+        label: label || undefined,
+        metadata: {},
+      };
+    }),
+    directed: simple.directed,
+    weighted: simple.weighted,
+    multigraph: simple.multigraph,
+    metadata: {},
+  };
+}
 
 // -----------------------------
 // Compressed Graph: JSON-stringified nodes/edges
@@ -79,7 +137,6 @@ export function compressGraph(graph: z.infer<typeof GraphSchema>) {
 // -----------------------------
 export enum CheckPhase {
   Idle = 'idle',
-  PreviewError = 'preview_error',
   Evaluated = 'evaluated',
 }
 
