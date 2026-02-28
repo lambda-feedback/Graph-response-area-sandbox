@@ -1,63 +1,58 @@
+import React, { useState, useEffect } from 'react'
 import {
   BaseResponseAreaProps,
   BaseResponseAreaWizardProps,
 } from '../base-props.type'
 import { ResponseAreaTub } from '../response-area-tub'
 
+import { ConfigPanel } from './components/ConfigPanel'
 import { GraphEditor } from './Graph.component'
-import { Graph, SimpleGraph, SimpleGraphSchema, GraphFeedback, CheckPhase, toSimpleGraph, fromSimpleGraph } from './type'
+import {
+  Graph,
+  GraphConfig,
+  GraphConfigSchema,
+  GraphAnswer,
+  GraphAnswerSchema,
+  GraphFeedback,
+  CheckPhase,
+  toSimpleGraph,
+  fromSimpleGraph,
+  graphAnswerToSimple,
+  simpleToAnswer,
+} from './type'
 import { validateGraph } from './validateGraph'
+
+const DEFAULT_CONFIG: GraphConfig = {
+  directed: false,
+  weighted: false,
+  multigraph: false,
+  evaluation_type: '',
+}
+
+const DEFAULT_ANSWER: GraphAnswer = {
+  nodes: [],
+  edges: [],
+}
 
 export class GraphResponseAreaTub extends ResponseAreaTub {
   public readonly responseType = 'HANDDRAWNGRAPH'
   public readonly displayWideInput = true
 
-  protected answerSchema = SimpleGraphSchema
-  protected configSchema = SimpleGraphSchema
+  protected answerSchema = GraphAnswerSchema
+  protected configSchema = GraphConfigSchema
 
-  // Correct answer for grading (teacher sets in "answer" panel)
-  protected answer: SimpleGraph = {
-    nodes: [],
-    edges: [],
-    directed: false,
-    weighted: false,
-    multigraph: false,
-  }
+  protected answer: GraphAnswer = { ...DEFAULT_ANSWER }
+  protected config: GraphConfig = { ...DEFAULT_CONFIG }
 
-  // Initial state shown to students (teacher sets in "preview" panel)
-  protected config: SimpleGraph = {
-    nodes: [],
-    edges: [],
-    directed: false,
-    weighted: false,
-    multigraph: false,
-  }
-
-  // Temporarily test with delegateFeedback = true
   public readonly delegateFeedback = true
 
   constructor() {
     super()
-    console.log('[Graph Constructor] GraphResponseAreaTub instantiated')
-    console.log('[Graph Constructor] customCheck method:', this.customCheck)
-    console.log('[Graph Constructor] typeof customCheck:', typeof this.customCheck)
   }
 
   initWithDefault = () => {
-    this.config = {
-      nodes: [],
-      edges: [],
-      directed: false,
-      weighted: false,
-      multigraph: false,
-    }
-    this.answer = {
-      nodes: [],
-      edges: [],
-      directed: false,
-      weighted: false,
-      multigraph: false,
-    }
+    this.config = { ...DEFAULT_CONFIG }
+    this.answer = { ...DEFAULT_ANSWER }
   }
 
   initWithConfig = () => {
@@ -68,26 +63,22 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
   // Override extractConfig to handle missing/invalid config gracefully
   protected extractConfig = (provided: any): void => {
     if (!provided || typeof provided !== 'object') {
-      // No config provided - use empty graph as default
-      this.config = {
-        nodes: [],
-        edges: [],
-        directed: false,
-        weighted: false,
-        multigraph: false,
-      }
+      this.config = { directed: false, weighted: false, multigraph: false, evaluation_type: '' }
       return
     }
 
     const parsedConfig = this.configSchema?.safeParse(provided)
     if (!parsedConfig || !parsedConfig.success) {
-      // Invalid config - use empty graph as default
+      // Legacy migration: config was a SimpleGraph — extract just the flags
+      // evaluation_type may be a legacy string[] — take first element
+      const legacyEval = provided.evaluation_type
       this.config = {
-        nodes: [],
-        edges: [],
-        directed: false,
-        weighted: false,
-        multigraph: false,
+        directed: provided.directed ?? false,
+        weighted: provided.weighted ?? false,
+        multigraph: provided.multigraph ?? false,
+        evaluation_type: Array.isArray(legacyEval)
+          ? (legacyEval[0] ?? '')
+          : (legacyEval ?? ''),
       }
       return
     }
@@ -95,133 +86,103 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
     this.config = parsedConfig.data
   }
 
-  // Override extractAnswer to properly store student's answer
+  // Override extractAnswer — answer may be flattened (nodes + edges + config flags)
   protected extractAnswer = (provided: any): void => {
-    console.log('[Graph extractAnswer] Called with:', provided)
-    
-    if (!provided || typeof provided !== 'object') {
-      console.log('[Graph extractAnswer] No valid answer provided')
-      return
-    }
+    if (!provided || typeof provided !== 'object') return
 
-    const parsedAnswer = this.answerSchema.safeParse(provided)
-    if (!parsedAnswer.success) {
-      console.log('[Graph extractAnswer] Failed to parse answer:', parsedAnswer.error)
-      return
+    if (Array.isArray(provided.nodes) && Array.isArray(provided.edges)) {
+      this.answer = { nodes: provided.nodes, edges: provided.edges }
+      // Always read config flags from the flattened answer
+      const legacyEval = provided.evaluation_type
+      this.config = {
+        directed: provided.directed ?? false,
+        weighted: provided.weighted ?? false,
+        multigraph: provided.multigraph ?? false,
+        evaluation_type: Array.isArray(legacyEval)
+          ? (legacyEval[0] ?? '')
+          : (legacyEval ?? ''),
+      }
     }
-
-    console.log('[Graph extractAnswer] Successfully extracted answer:', parsedAnswer.data)
-    this.answer = parsedAnswer.data
   }
 
   /* -------------------- Custom Check -------------------- */
   customCheck = (): boolean => {
-    console.log('[Graph customCheck] Called')
-    console.log('[Graph customCheck] this.answer:', this.answer)
-    
-    // Validate the student's answer before submission
-    if (!this.answer || this.answer.nodes.length === 0) {
-      console.log('[Graph customCheck] No answer or empty graph - returning false')
-      return false // No answer to submit
-    }
-
-    // Convert from SimpleGraph to Graph for validation
-    const graph = fromSimpleGraph(this.answer)
-    console.log('[Graph customCheck] Converted graph:', graph)
-
-    // Validate the graph
+    if (!this.answer || this.answer.nodes.length === 0) return false
+    const graph = fromSimpleGraph(graphAnswerToSimple(this.answer, this.config))
     const feedback = validateGraph(graph)
-    
-    console.log('[Graph customCheck] Validation feedback:', feedback)
-    
-    // Check if there are any errors
-    const hasErrors = feedback.errors.filter(e => e.type === 'error').length > 0
-    
-    console.log('[Graph customCheck] Has errors:', hasErrors)
-    console.log('[Graph customCheck] Returning:', !hasErrors)
-    
-    // Return true if valid, false if there are errors
-    return !hasErrors
+    return feedback.errors.filter(e => e.type === 'error').length === 0
   }
 
   /* -------------------- Input -------------------- */
   InputComponent = (props: BaseResponseAreaProps) => {
-    console.log('[Graph InputComponent] Rendering with props.answer:', props.answer)
-    console.log('[Graph InputComponent] Current this.answer:', this.answer)
-    
-    // In teacher preview mode, edit the initial config
-    // In student mode, start with config and save to props.answer
     const isTeacherPreview = props.isTeacherMode && props.hasPreview
-    
-    // Determine the source of truth for the graph data
-    const initialGraph: SimpleGraph = (() => {
+
+    // Resolve answer (topology only) — props.answer is the parent's managed state
+    const resolvedAnswer: GraphAnswer = (() => {
       if (props.answer) {
-        // If props.answer exists, use it (parent component's state)
-        const parsed = this.answerSchema.safeParse(props.answer)
-        if (parsed.success) {
-          console.log('[Graph InputComponent] Using parsed props.answer:', parsed.data)
-          return parsed.data
-        } else {
-          console.log('[Graph InputComponent] Failed to parse props.answer:', parsed.error)
-        }
-      } else {
-        console.log('[Graph InputComponent] No props.answer provided')
+        const parsed = GraphAnswerSchema.safeParse(props.answer)
+        if (parsed.success) return parsed.data
+        // Legacy SimpleGraph in answer
+        const leg = props.answer as any
+        if (Array.isArray(leg.nodes) && Array.isArray(leg.edges))
+          return { nodes: leg.nodes, edges: leg.edges }
       }
-      
-      // Fallback to config (initial state) or answer (for teacher answer panel)
-      const fallback = isTeacherPreview ? this.config : (this.config ?? this.answer)
-      console.log('[Graph InputComponent] Using fallback:', fallback)
-      return fallback
+      return this.answer
     })()
 
-    /* ---------- Extract submitted feedback ---------- */
+    // Resolve config — read from flattened answer first, then props.config, then tub state
+    const resolvedConfig: GraphConfig = (() => {
+      // Config flags may be flattened into the answer
+      const ans = props.answer as any
+      if (ans && (typeof ans.directed !== 'undefined' || typeof ans.evaluation_type !== 'undefined')) {
+        const eval_ = ans.evaluation_type
+        return {
+          directed: ans.directed ?? false,
+          weighted: ans.weighted ?? false,
+          multigraph: ans.multigraph ?? false,
+          evaluation_type: Array.isArray(eval_) ? (eval_[0] ?? '') : (eval_ ?? ''),
+        }
+      }
+      if (props.config) {
+        const parsed = GraphConfigSchema.safeParse(props.config)
+        if (parsed.success) return parsed.data
+        const leg = props.config as any
+        return {
+          directed: leg.directed ?? false,
+          weighted: leg.weighted ?? false,
+          multigraph: leg.multigraph ?? false,
+          evaluation_type: leg.evaluation_type ?? '',
+        }
+      }
+      return this.config
+    })()
+
+    // Parse submitted feedback
     const submittedFeedback: GraphFeedback | null = (() => {
       const raw = props.feedback?.feedback
       if (!raw) return null
-
       try {
         const jsonPart = raw.split('<br />')[1]?.trim()
         if (!jsonPart) return null
         return JSON.parse(jsonPart)
-      } catch (e) {
-        console.error('Failed to parse feedback JSON:', e)
+      } catch {
         return null
       }
     })()
 
-    /* ---------- Effective feedback ---------- */
-    const effectiveFeedback = submittedFeedback
-
-    // Convert from SimpleGraph to Graph for editor
-    const graph: Graph = fromSimpleGraph(initialGraph)
-
+    // Config is read-only here — set exclusively via WizardComponent.
+    // InputComponent only carries answer changes via props.handleChange.
+    const graph: Graph = fromSimpleGraph(graphAnswerToSimple(resolvedAnswer, resolvedConfig))
     return (
       <GraphEditor
-        key={isTeacherPreview ? "teacher-preview-editor" : "student-input-editor"}
+        key={isTeacherPreview ? 'teacher-preview' : 'student-input'}
         graph={graph}
-        feedback={effectiveFeedback}
+        feedback={submittedFeedback}
         phase={CheckPhase.Idle}
         onChange={(val: Graph) => {
-          console.log('[Graph onChange] Called with graph:', val)
-
-          // Convert to SimpleGraph for backend
-          const simple = toSimpleGraph(val)
-
-          if (isTeacherPreview) {
-            // Teacher is editing the initial config in preview section
-            console.log('[Graph onChange] Updating this.config')
-            this.config = simple
-          } else {
-            // Student is working - save their current answer for validation
-            console.log('[Graph onChange] Updating this.answer')
-            this.answer = simple
-          }
-
-          console.log('[Graph onChange] After update, this.answer:', this.answer)
-
-          console.log('[Graph onChange] Calling props.handleChange with simple graph data')
-          props.handleChange(simple)
-          console.log('[Graph onChange] props.handleChange called')
+          const newAnswer = simpleToAnswer(toSimpleGraph(val))
+          this.answer = newAnswer
+          props.handleChange(newAnswer)
         }}
       />
     )
@@ -229,27 +190,103 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
 
   /* -------------------- Wizard -------------------- */
   WizardComponent = (props: BaseResponseAreaWizardProps) => {
-    // Wizard shows correct answer for grading
-    // The separate "Response Area Preview" section handles the initial state (config)
-    const answerGraph: Graph = fromSimpleGraph(this.answer)
-
     return (
-      <GraphEditor
-        key="wizard-answer-editor"
-        graph={answerGraph}
-        feedback={null}
-        phase={CheckPhase.Evaluated}
-        onChange={(val: Graph) => {
-          const simple = toSimpleGraph(val)
-          this.answer = simple
-
+      <WizardPanel
+        initialConfig={this.config}
+        initialAnswer={this.answer}
+        onChange={(config, answer) => {
+          this.config = config
+          this.answer = answer
+          // Flatten config fields into the answer — backend reads from answer, not config
+          const flatAnswer = {
+            ...answer,
+            directed: config.directed,
+            weighted: config.weighted,
+            multigraph: config.multigraph,
+            evaluation_type: config.evaluation_type,
+          }
+          console.log('[GraphTub] sending to backend:', flatAnswer)
           props.handleChange({
             responseType: this.responseType,
-            config: this.config,
-            answer: simple,
+            answer: flatAnswer,
           })
         }}
       />
     )
   }
+}
+
+/* ================================================================
+   Stable sub-components — defined outside the class so React never
+   treats them as new component types on re-render, which would
+   unmount/remount GraphEditor and lose all Cytoscape canvas state.
+================================================================ */
+
+interface WizardPanelProps {
+  initialConfig: GraphConfig
+  initialAnswer: GraphAnswer
+  onChange: (config: GraphConfig, answer: GraphAnswer) => void
+}
+
+const WizardPanel: React.FC<WizardPanelProps> = ({
+  initialConfig,
+  initialAnswer,
+  onChange,
+}) => {
+  const [config, setConfig] = useState<GraphConfig>(initialConfig)
+  const [answer, setAnswer] = useState<GraphAnswer>(initialAnswer)
+
+  // Emit initial state on mount so config is always persisted to DB,
+  // even if the teacher never interacts with the config panel.
+  useEffect(() => {
+    onChange(initialConfig, initialAnswer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleConfigChange = (updatedConfig: GraphConfig) => {
+    setConfig(updatedConfig)
+    onChange(updatedConfig, answer)
+  }
+
+  const handleAnswerChange = (val: Graph) => {
+    // evaluation_type is now a plain string; wrap for toSimpleGraph which expects string[]
+    const newAnswer = simpleToAnswer(toSimpleGraph(val, config.evaluation_type ? [config.evaluation_type] : []))
+    setAnswer(newAnswer)
+    onChange(config, newAnswer)
+  }
+
+  const isIsomorphism = config.evaluation_type?.includes('isomorphism')
+  const graph: Graph = fromSimpleGraph(graphAnswerToSimple(answer, config))
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <ConfigPanel
+        config={config}
+        onChange={handleConfigChange}
+      />
+      {isIsomorphism && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: 16 }}>Reference Graph (for Isomorphism)</h3>
+          <p style={{ margin: 0, fontSize: 13, color: '#555' }}>Draw the graph the student's answer will be compared against.</p>
+          <GraphEditor
+            key="wizard-isomorphism-editor"
+            graph={graph}
+            feedback={null}
+            phase={CheckPhase.Idle}
+            onChange={handleAnswerChange}
+          />
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <h3 style={{ margin: 0, fontWeight: 600, fontSize: 16 }}>Answer Graph</h3>
+        <GraphEditor
+          key="wizard-answer-editor"
+          graph={graph}
+          feedback={null}
+          phase={CheckPhase.Idle}
+          onChange={handleAnswerChange}
+        />
+      </div>
+    </div>
+  )
 }

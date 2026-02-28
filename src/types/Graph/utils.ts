@@ -28,7 +28,8 @@ export class GraphConverter {
       edges: graph.edges.map(e => `${e.source}|${e.target}|${e.weight || 1}|${e.label || ''}`),
       directed: graph.directed,
       weighted: graph.weighted,
-      multigraph: graph.multigraph
+      multigraph: graph.multigraph,
+      evaluation_type: [],
     }
   }
 

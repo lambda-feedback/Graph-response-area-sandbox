@@ -140,7 +140,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           style: { 
             label: 'data(label)', 
             'curve-style': 'bezier', 
-            'target-arrow-shape': 'triangle', 
+            'target-arrow-shape': graph.directed ? 'triangle' : 'none', 
             'line-color': '#555', 
             'target-arrow-color': '#555',
             'font-size': '12px'
@@ -172,6 +172,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       cyRef.current = null
     }
   }, [])
+
+  /* -------------------- Update arrow style when directed flag changes -------------------- */
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.style()
+      .selector('edge')
+      .style({ 'target-arrow-shape': graph.directed ? 'triangle' : 'none' })
+      .update()
+  }, [graph.directed])
 
   /* -------------------- Update Node Counter -------------------- */
   useEffect(() => {

@@ -48,7 +48,7 @@ export const GraphSchema = z.object({
 export type Graph = z.infer<typeof GraphSchema>
 
 // -----------------------------
-// Simplified Graph: for backend communication (like FSA)
+// Simplified Graph: for internal editor use (topology + flags merged)
 // -----------------------------
 export const SimpleGraphSchema = z.object({
   // Nodes as pipe-delimited strings: "id|label|x|y"
@@ -58,12 +58,38 @@ export const SimpleGraphSchema = z.object({
   directed: z.boolean().default(false),
   weighted: z.boolean().default(false),
   multigraph: z.boolean().default(false),
+  evaluation_type: z.array(z.string()).default([]),
 });
 
 export type SimpleGraph = z.infer<typeof SimpleGraphSchema>
 
+// -----------------------------
+// GraphConfig: teacher-configured params (stored in config, NOT in answer)
+// directed, weighted, multigraph, evaluation_type live here
+// -----------------------------
+export const GraphConfigSchema = z.object({
+  directed: z.boolean().default(false),
+  weighted: z.boolean().default(false),
+  multigraph: z.boolean().default(false),
+  // Plain string — backend Pydantic EvaluationParams expects e.g. 'connectivity', not ['connectivity']
+  evaluation_type: z.string().default(''),
+});
+
+export type GraphConfig = z.infer<typeof GraphConfigSchema>
+
+// -----------------------------
+// GraphAnswer: student/teacher answer — topology only (nodes + edges)
+// flags (directed, weighted, etc.) come from GraphConfig, not stored here
+// -----------------------------
+export const GraphAnswerSchema = z.object({
+  nodes: z.array(z.string()),
+  edges: z.array(z.string()),
+});
+
+export type GraphAnswer = z.infer<typeof GraphAnswerSchema>
+
 // Helper functions to convert between Graph and SimpleGraph
-export function toSimpleGraph(graph: Graph): SimpleGraph {
+export function toSimpleGraph(graph: Graph, evaluationType?: string[]): SimpleGraph {
   return {
     nodes: graph.nodes.map(n => 
       `${n.id}|${n.label || ''}|${n.x || 0}|${n.y || 0}`
@@ -74,6 +100,28 @@ export function toSimpleGraph(graph: Graph): SimpleGraph {
     directed: graph.directed,
     weighted: graph.weighted,
     multigraph: graph.multigraph,
+    evaluation_type: evaluationType ?? [],
+  };
+}
+
+// Merge a GraphAnswer (topology) with a GraphConfig (flags) into a SimpleGraph for the editor
+export function graphAnswerToSimple(answer: GraphAnswer, config: GraphConfig): SimpleGraph {
+  return {
+    nodes: answer.nodes,
+    edges: answer.edges,
+    directed: config.directed,
+    weighted: config.weighted,
+    multigraph: config.multigraph,
+    // Wrap the string into an array for internal SimpleGraph usage
+    evaluation_type: config.evaluation_type ? [config.evaluation_type] : [],
+  };
+}
+
+// Extract only topology from a SimpleGraph (strips config flags)
+export function simpleToAnswer(simple: SimpleGraph): GraphAnswer {
+  return {
+    nodes: simple.nodes,
+    edges: simple.edges,
   };
 }
 
@@ -103,6 +151,7 @@ export function fromSimpleGraph(simple: SimpleGraph): Graph {
     weighted: simple.weighted,
     multigraph: simple.multigraph,
     metadata: {},
+    // evaluation_type lives on SimpleGraph only, not on the rich Graph type
   };
 }
 
