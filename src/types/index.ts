@@ -1,17 +1,20 @@
-import { IModularResponseSchema } from '@modules/shared/schemas/question-form.schema'
-import { z } from 'zod'
-
 import { CodeResponseAreaTub } from './Code'
 import { EssayResponseAreaTub } from './Essay'
 import { GraphResponseAreaTub } from './Graph'
+import { ImagesResponseAreaTub } from './Images'
+import { LikertResponseAreaTub } from './Likert'
+import { MathMultiLinesResponseAreaTub } from './MathMultiLines'
+import { MathSingleLineResponseAreaTub } from './MathSingleLine'
 import { MatrixResponseAreaTub } from './Matrix'
 import { MultipleChoiceResponseAreaTub } from './MultipleChoice'
 import { NumberResponseAreaTub } from './NumberInput'
 import { NumericUnitsResponseAreaTub } from './NumericUnits'
 import { ResponseAreaTub } from './response-area-tub'
+import { isResponseAreaSandboxType } from './sandbox'
 import { TableResponseAreaTub } from './Table'
 import { TextResponseAreaTub } from './TextInput'
 import { TrueFalseResponseAreaTub } from './TrueFalse'
+import { VoidResponseAreaTub } from './void-response-area'
 
 export const supportedResponseTypes = [
   'BOOLEAN',
@@ -26,7 +29,7 @@ export const supportedResponseTypes = [
   'ESSAY',
   'CODE',
   'MILKDOWN',
-  'FSA'
+  'HANDDRAWNGRAPH'
 ]
 
 if (typeof window !== 'undefined') {
@@ -74,12 +77,8 @@ class VoidResponseAreaTub extends ResponseAreaTub {
 }
 
 const createReponseAreaTub = (type: string): ResponseAreaTub => {
-  if (
-    type ===
-      (JSON.parse(localStorage.getItem('tubify-name') ?? '') as string) &&
-    'TubifyComponent' in window
-  ) {
-    return new (window.TubifyComponent as new () => ResponseAreaTub)()
+  if (isResponseAreaSandboxType(type) && 'SandboxComponent' in window) {
+    return new (window.SandboxComponent as new () => ResponseAreaTub)()
   }
 
   switch (type) {
@@ -103,10 +102,18 @@ const createReponseAreaTub = (type: string): ResponseAreaTub => {
       return new CodeResponseAreaTub()
     case 'HANDDRAWNGRAPH':
       return new GraphResponseAreaTub()
+    case 'LIKERT':
+      return new LikertResponseAreaTub()
+    case 'MATH_SINGLE_LINE':
+      return new MathSingleLineResponseAreaTub()
+    case 'MATH_MULTI_LINES':
+      return new MathMultiLinesResponseAreaTub()
+    case 'IMAGES':
+      return new ImagesResponseAreaTub()
     case 'VOID':
       return new VoidResponseAreaTub()
     default:
-      console.error('Unknown response area Tub type: ' + type)
+      console.error('Unknown ResponseAreaTub', { type })
       return new VoidResponseAreaTub()
   }
 }
