@@ -10,7 +10,6 @@ import { MultipleChoiceResponseAreaTub } from './MultipleChoice'
 import { NumberResponseAreaTub } from './NumberInput'
 import { NumericUnitsResponseAreaTub } from './NumericUnits'
 import { ResponseAreaTub } from './response-area-tub'
-import { isResponseAreaSandboxType } from './sandbox'
 import { TableResponseAreaTub } from './Table'
 import { TextResponseAreaTub } from './TextInput'
 import { TrueFalseResponseAreaTub } from './TrueFalse'
@@ -29,57 +28,13 @@ export const supportedResponseTypes = [
   'ESSAY',
   'CODE',
   'MILKDOWN',
-  'HANDDRAWNGRAPH'
+  'LIKERT',
+  'MATH_SINGLE_LINE',
+  'MATH_MULTI_LINES',
+  'IMAGES',
 ]
 
-if (typeof window !== 'undefined') {
-  const TUBIFY_NAME = localStorage.getItem('tubify-name')
-  const TUBIFY_URL = localStorage.getItem('tubify-url')
-  if (TUBIFY_NAME && TUBIFY_URL) {
-    console.debug('ENABLING TUBIFY', {
-      name: TUBIFY_NAME,
-      url: TUBIFY_URL,
-    })
-    const loadComponent = async () => {
-      const response = await fetch(`${JSON.parse(TUBIFY_URL)}/tubify.iife.js`)
-      const componentCode = await response.text()
-
-      const script = document.createElement('script')
-      script.textContent = componentCode
-      document.head.appendChild(script)
-    }
-    loadComponent().then(() => {
-      supportedResponseTypes.push(TUBIFY_NAME)
-    })
-  }
-}
-
-class VoidResponseAreaTub extends ResponseAreaTub {
-  // public readonly responseType = 'VOID'
-  public readonly responseType = 'SANDBOX'
-
-  protected answerSchema = z.any()
-
-  toResponse = (): IModularResponseSchema => {
-    return {
-      responseType: '',
-      answer: null,
-    }
-  }
-
-  InputComponent = () => {
-    return null
-  }
-
-  WizardComponent = () => {
-    return null
-  }
-}
-
 const createReponseAreaTub = (type: string): ResponseAreaTub => {
-  if (isResponseAreaSandboxType(type) && 'SandboxComponent' in window) {
-    return new (window.SandboxComponent as new () => ResponseAreaTub)()
-  }
 
   switch (type) {
     case 'BOOLEAN':
@@ -100,8 +55,6 @@ const createReponseAreaTub = (type: string): ResponseAreaTub => {
       return new EssayResponseAreaTub()
     case 'CODE':
       return new CodeResponseAreaTub()
-    case 'HANDDRAWNGRAPH':
-      return new GraphResponseAreaTub()
     case 'LIKERT':
       return new LikertResponseAreaTub()
     case 'MATH_SINGLE_LINE':
@@ -110,10 +63,12 @@ const createReponseAreaTub = (type: string): ResponseAreaTub => {
       return new MathMultiLinesResponseAreaTub()
     case 'IMAGES':
       return new ImagesResponseAreaTub()
+    case 'HANDDRAWNGRAPH':
+      return new GraphResponseAreaTub()
     case 'VOID':
       return new VoidResponseAreaTub()
     default:
-      console.error('Unknown ResponseAreaTub', { type })
+      console.error('Unknown response area Tub type: ' + type)
       return new VoidResponseAreaTub()
   }
 }
