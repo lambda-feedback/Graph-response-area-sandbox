@@ -13,14 +13,11 @@ import {
   GraphConfigSchema,
   GraphAnswer,
   GraphAnswerSchema,
-  GraphFeedback,
-  CheckPhase,
   toSimpleGraph,
   fromSimpleGraph,
   graphAnswerToSimple,
   simpleToAnswer,
 } from './type'
-import { validateGraph } from './validateGraph'
 
 const DEFAULT_CONFIG: GraphConfig = {
   directed: false,
@@ -107,10 +104,7 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
 
   /* -------------------- Custom Check -------------------- */
   customCheck = (): boolean => {
-    if (!this.answer || this.answer.nodes.length === 0) return false
-    const graph = fromSimpleGraph(graphAnswerToSimple(this.answer, this.config))
-    const feedback = validateGraph(graph)
-    return feedback.errors.filter(e => e.type === 'error').length === 0
+    return !!(this.answer && this.answer.nodes.length > 0)
   }
 
   /* -------------------- Input -------------------- */
@@ -157,19 +151,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       return this.config
     })()
 
-    // Parse submitted feedback
-    const submittedFeedback: GraphFeedback | null = (() => {
-      const raw = props.feedback?.feedback
-      if (!raw) return null
-      try {
-        const jsonPart = raw.split('<br />')[1]?.trim()
-        if (!jsonPart) return null
-        return JSON.parse(jsonPart)
-      } catch {
-        return null
-      }
-    })()
-
     // Config is read-only here — set exclusively via WizardComponent.
     // InputComponent only carries answer changes via props.handleChange.
     const graph: Graph = fromSimpleGraph(graphAnswerToSimple(resolvedAnswer, resolvedConfig))
@@ -177,8 +158,6 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
       <GraphEditor
         key={isTeacherPreview ? 'teacher-preview' : 'student-input'}
         graph={graph}
-        feedback={submittedFeedback}
-        phase={CheckPhase.Idle}
         onChange={(val: Graph) => {
           const newAnswer = simpleToAnswer(toSimpleGraph(val))
           this.answer = newAnswer
@@ -271,8 +250,6 @@ const WizardPanel: React.FC<WizardPanelProps> = ({
           <GraphEditor
             key="wizard-isomorphism-editor"
             graph={graph}
-            feedback={null}
-            phase={CheckPhase.Idle}
             onChange={handleAnswerChange}
           />
         </div>

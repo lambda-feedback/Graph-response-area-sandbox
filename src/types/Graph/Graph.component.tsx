@@ -3,8 +3,7 @@ import cytoscape, { Core, NodeSingular, EdgeSingular } from 'cytoscape'
 import paper from 'paper'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 
-import { GraphFeedbackPanel } from './components/GraphFeedbackPanel'
-import { Graph, Node, Edge, GraphFeedback, CheckPhase } from './type'
+import { Graph, Node, Edge } from './type'
 
 /* ----------------------------- Local Styles ----------------------------- */
 export const useLocalStyles = makeStyles()((theme) => ({
@@ -77,15 +76,11 @@ export const useLocalStyles = makeStyles()((theme) => ({
 interface GraphEditorProps {
   graph: Graph
   onChange: (graph: Graph) => void
-  feedback?: GraphFeedback | null
-  phase?: CheckPhase
 }
 
 export const GraphEditor: React.FC<GraphEditorProps> = ({ 
   graph, 
   onChange, 
-  feedback = null, 
-  phase = CheckPhase.Idle 
 }) => {
   const { classes } = useLocalStyles()
 
@@ -742,10 +737,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           </>
         ) : null}
 
-        {/* -------------------- Validation Feedback Panel -------------------- */}
-        <div style={{ marginTop: '16px' }}>
-          <GraphFeedbackPanel feedback={feedback} phase={phase} />
-        </div>
       </div>
 
       {/* -------------------- Cytoscape + Paper Canvas -------------------- */}
