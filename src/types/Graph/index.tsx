@@ -111,18 +111,8 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
   InputComponent = (props: BaseResponseAreaProps) => {
     const isTeacherPreview = props.isTeacherMode && props.hasPreview
 
-    // Resolve answer (topology only) — props.answer is the parent's managed state
-    const resolvedAnswer: GraphAnswer = (() => {
-      if (props.answer) {
-        const parsed = GraphAnswerSchema.safeParse(props.answer)
-        if (parsed.success) return parsed.data
-        // Legacy SimpleGraph in answer
-        const leg = props.answer as any
-        if (Array.isArray(leg.nodes) && Array.isArray(leg.edges))
-          return { nodes: leg.nodes, edges: leg.edges }
-      }
-      return this.answer
-    })()
+    // Student always starts with an empty graph — never pre-filled from the answer
+    const [studentAnswer, setStudentAnswer] = useState<GraphAnswer>({ nodes: [], edges: [] })
 
     // Resolve config — read from flattened answer first, then props.config, then tub state
     const resolvedConfig: GraphConfig = (() => {
@@ -153,13 +143,14 @@ export class GraphResponseAreaTub extends ResponseAreaTub {
 
     // Config is read-only here — set exclusively via WizardComponent.
     // InputComponent only carries answer changes via props.handleChange.
-    const graph: Graph = fromSimpleGraph(graphAnswerToSimple(resolvedAnswer, resolvedConfig))
+    const graph: Graph = fromSimpleGraph(graphAnswerToSimple(studentAnswer, resolvedConfig))
     return (
       <GraphEditor
         key={isTeacherPreview ? 'teacher-preview' : 'student-input'}
         graph={graph}
         onChange={(val: Graph) => {
           const newAnswer = simpleToAnswer(toSimpleGraph(val))
+          setStudentAnswer(newAnswer)
           this.answer = newAnswer
           props.handleChange(newAnswer)
         }}
