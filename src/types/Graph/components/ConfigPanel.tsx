@@ -1,5 +1,6 @@
 import React from 'react';
 import { GraphConfig } from '../type';
+import { useConfigPanelStyles } from './ConfigPanel.styles';
 
 const evaluationOptions = [
 	'isomorphism',
@@ -29,6 +30,7 @@ interface ConfigPanelProps {
 }
 
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onChange, AnswerPanel }) => {
+	const { classes, cx } = useConfigPanelStyles()
 	const [selectedType, setSelectedType] = React.useState<string>(config.evaluation_type ?? '')
 	const [directed, setDirected] = React.useState<boolean>(config.directed ?? false)
 
@@ -46,35 +48,22 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onChange, Answ
 		updateConfig({ directed: val });
 	};
 
-	const radioStyle = (active: boolean): React.CSSProperties => ({
-		display: 'flex',
-		alignItems: 'center',
-		padding: '10px 20px',
-		cursor: 'pointer',
-		border: active ? '2px solid #0057b8' : '1px solid #d9d9d9',
-		background: active ? '#cce6ff' : '#fff',
-		borderRadius: '8px',
-		fontWeight: active ? 700 : 400,
-		color: active ? '#0057b8' : '#333',
-		transition: 'all 0.2s',
-	});
-
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: 400 }}>
+		<div className={classes.container}>
 
 			{/* ---- Directed / Undirected toggle ---- */}
 			<div>
-				<h3 style={{ marginBottom: 8, fontWeight: 600, fontSize: 18 }}>Graph Type</h3>
-				<div style={{ display: 'flex', gap: '12px' }}>
+				<h3 className={classes.sectionHeading}>Graph Type</h3>
+				<div className={classes.radioGroupRow}>
 					{([false, true] as const).map(val => (
-						<label key={String(val)} style={radioStyle(directed === val)}>
+						<label key={String(val)} className={cx(classes.radioLabel, directed === val && classes.radioLabelActive)}>
 							<input
 								type="radio"
 								name="graph-directed"
 								value={String(val)}
 								checked={directed === val}
 								onChange={() => handleDirectedToggle(val)}
-								style={{ accentColor: '#0057b8', marginRight: 10 }}
+								className={classes.radioInput}
 							/>
 							{val ? 'Directed' : 'Undirected'}
 						</label>
@@ -84,15 +73,12 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onChange, Answ
 
 			{/* ---- Evaluation type selector ---- */}
 			<div>
-				<h3 style={{ marginBottom: 8, fontWeight: 600, fontSize: 18 }}>Evaluation Type</h3>
-				<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+				<h3 className={classes.sectionHeading}>Evaluation Type</h3>
+				<div className={classes.radioGroupColumn}>
 					{evaluationOptions.map(type => (
 						<label
 							key={type}
-							style={{
-								...radioStyle(selectedType === type),
-								boxShadow: selectedType === type ? '0 0 8px #0057b833' : 'none',
-							}}
+							className={cx(classes.radioLabel, selectedType === type && classes.radioLabelActive)}
 						>
 							<input
 								type="radio"
@@ -100,9 +86,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onChange, Answ
 								value={type}
 								checked={selectedType === type}
 								onChange={() => handleTypeChange(type)}
-								style={{ accentColor: '#0057b8', marginRight: 16 }}
+								className={classes.radioInputWide}
 							/>
-							<span style={{ fontSize: 15 }}>{type.replace(/_/g, ' ')}</span>
+							<span className={classes.radioOptionText}>{type.replace(/_/g, ' ')}</span>
 						</label>
 					))}
 				</div>
