@@ -1,76 +1,9 @@
-import { makeStyles } from '@styles'
 import cytoscape, { Core, NodeSingular, EdgeSingular } from 'cytoscape'
 import paper from 'paper'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 
 import { Graph, Node, Edge } from './type'
-
-/* ----------------------------- Local Styles ----------------------------- */
-export const useLocalStyles = makeStyles()((theme) => ({
-  container: { 
-    width: '100%', 
-    height: 600, 
-    display: 'flex', 
-    border: '1px solid #ddd', 
-    fontFamily: 'sans-serif', 
-    position: 'relative' 
-  },
-  panel: { 
-    width: 280, 
-    padding: theme.spacing(2), 
-    borderRight: '1px solid #ddd', 
-    backgroundColor: '#fafafa', 
-    display: 'flex', 
-    flexDirection: 'column', 
-    gap: theme.spacing(2), 
-    overflowY: 'auto' 
-  },
-  panelTitle: { 
-    fontWeight: 600, 
-    fontSize: 16, 
-    borderBottom: '1px solid #eee', 
-    paddingBottom: theme.spacing(1) 
-  },
-  field: { 
-    display: 'flex', 
-    flexDirection: 'column', 
-    gap: theme.spacing(0.5) 
-  },
-  inputField: { 
-    padding: '6px 8px', 
-    border: '1px solid #ccc', 
-    borderRadius: 4 
-  },
-  addButton: { 
-    padding: '6px 10px', 
-    backgroundColor: '#fff', 
-    border: '1px solid #ccc', 
-    borderRadius: 4, 
-    cursor: 'pointer' 
-  },
-  deleteButton: { 
-    padding: '6px', 
-    backgroundColor: '#fff1f0', 
-    color: '#cf1322', 
-    border: '1px solid #ffa39e', 
-    borderRadius: 4, 
-    cursor: 'pointer', 
-    fontWeight: 600 
-  },
-  cyWrapper: { 
-    flexGrow: 1, 
-    position: 'relative' 
-  },
-  drawCanvas: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    width: '100%', 
-    height: '100%', 
-    pointerEvents: 'none',
-    zIndex: 10 
-  }
-}))
+import { useLocalStyles } from './Graph.component.styles'
 
 /* ----------------------------- Graph Editor ----------------------------- */
 interface GraphEditorProps {
