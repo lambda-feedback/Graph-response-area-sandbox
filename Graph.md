@@ -73,10 +73,6 @@ type GraphAnswer = {
 }
 ```
 
-### Compressed Graph (`CompressedGraph`)
-
-An alternative serialisation where nodes and edges are JSON-stringified arrays stored as strings. Defined in `type.ts` alongside `compressGraph()`.
-
 ### Validation & Feedback Types
 
 ```typescript
@@ -101,14 +97,13 @@ interface GraphFeedback {
 
 ```
 src/types/Graph/
-  Graph.component.tsx         # GraphEditor — Cytoscape + Paper.js visual editor
+  Graph.component.tsx         # GraphEditor — Cytoscape + Paper.js visual editor (panel inlined)
   Graph.component.styles.ts   # makeStyles (emotion/tss-react) styles for GraphEditor
   index.tsx                   # GraphResponseAreaTub, WizardPanel, InputComponent
   type.ts                     # All Zod schemas, types, and conversion utilities
   components/
     ConfigPanel.tsx           # Teacher config UI (graph type, evaluation type)
     ConfigPanel.styles.ts     # makeStyles styles for ConfigPanel
-    ItemPropertiesPanel.tsx   # Side panel: edit/delete selected node or edge
 ```
 
 > **Note:** Styles use `makeStyles` from `@styles` (tss-react/emotion) rather than CSS modules. This is required because the project builds as an IIFE library — CSS modules are extracted into a separate file that may not be loaded by the consuming app, while emotion injects styles at runtime inside the JS bundle.
@@ -126,7 +121,7 @@ The primary visual editor.
   - **Draw a circle** → creates a new node at the circle's centre.
   - **Draw a line between nodes** → creates a new edge between the two closest nodes.
   - **Click two nodes** (while in draw mode) → creates an edge between them.
-- **Selection**: Clicking a node or edge selects it; its properties appear in `ItemPropertiesPanel`.
+- **Selection**: Clicking a node or edge selects it; its properties appear in the inlined **Item Properties** side panel.
 - **Sync**: Every mutation (add/delete/edit) calls `syncToGraph()`, which reads Cytoscape state and fires `onChange(graph)`.
 
 ### `components/ConfigPanel.tsx`
@@ -135,19 +130,19 @@ Teacher-facing configuration panel (rendered in `WizardComponent` only).
 
 - Toggle **Directed / Undirected**.
 - Select an **Evaluation Type** (e.g. `isomorphism`, `connectivity`, `tree`, ...).
-- For `isomorphism`, a second `GraphEditor` is rendered below as the reference graph.
+- Accepts an optional `AnswerPanel?: React.ReactNode` prop, rendered below the evaluation-type selector when `isomorphism` is selected.
 - Styles are extracted to `ConfigPanel.styles.ts`.
 
-### `components/ItemPropertiesPanel.tsx`
+### Item Properties Panel (inlined in `Graph.component.tsx`)
 
-Side panel rendered inside `GraphEditor` for editing selected elements:
+Left side panel rendered directly inside `GraphEditor` for editing selected elements:
 
 - **Add Node** button.
 - **Fit to Screen** button.
 - **Draw Edge** toggle (activates draw mode).
 - Edit **Display Name** of a selected node.
 - Edit **Edge Label** of a selected edge.
-- **Delete Selected** button.
+- **Delete** button for nodes and edges.
 
 ---
 
@@ -161,7 +156,6 @@ Conversion utilities in `type.ts` handle the boundary between the rich editor fo
 | `fromSimpleGraph(simple)` | `SimpleGraph` | `Graph` |
 | `graphAnswerToSimple(answer, config)` | `GraphAnswer` + `GraphConfig` | `SimpleGraph` |
 | `simpleToAnswer(simple)` | `SimpleGraph` | `GraphAnswer` |
-| `compressGraph(graph)` | `Graph` | `CompressedGraph` |
 
 ---
 
