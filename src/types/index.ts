@@ -10,6 +10,7 @@ import { MultipleChoiceResponseAreaTub } from './MultipleChoice'
 import { NumberResponseAreaTub } from './NumberInput'
 import { NumericUnitsResponseAreaTub } from './NumericUnits'
 import { ResponseAreaTub } from './response-area-tub'
+import { isResponseAreaSandboxType } from './sandbox'
 import { TableResponseAreaTub } from './Table'
 import { TextResponseAreaTub } from './TextInput'
 import { TrueFalseResponseAreaTub } from './TrueFalse'
@@ -35,6 +36,9 @@ export const supportedResponseTypes = [
 ]
 
 const createReponseAreaTub = (type: string): ResponseAreaTub => {
+  if (isResponseAreaSandboxType(type) && 'SandboxComponent' in window) {
+    return new (window.SandboxComponent as new () => ResponseAreaTub)()
+  }
 
   switch (type) {
     case 'BOOLEAN':
